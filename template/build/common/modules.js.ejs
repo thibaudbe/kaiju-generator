@@ -1,0 +1,30 @@
+const path = require('path')
+const ExtractTextPlugin = require('extract-text-webpack-plugin')
+
+const extractPrepros = ExtractTextPlugin.extract({
+  fallback: 'style-loader',
+  use: [
+    { loader: 'css-loader', query: { modules: true, localIdentName: '[local]-[hash:base64:5]' } },
+    { loader: '<%- cssExtension === "scss" ? "sass" : (cssExtension === "styl" ? "stylus" : cssExtension) %>-loader' }
+  ]
+})
+
+const tsconfig     = path.resolve(__dirname, '../../tsconfig.json')
+const tslintConfig = path.resolve(__dirname, '../tslint.json')
+
+
+module.exports = ({ isProd }) => {
+  const tsOptions = {
+    configFile: tslintConfig,
+    emitErrors: isProd,
+    failOnHint: isProd
+  }
+
+  const tsLinter    = { test: /\.ts$/, enforce: 'pre', loader: 'tslint-loader', options: tsOptions }
+  const tsLoader    = { test: /\.ts$/, loader: 'ts-loader', options: { configFileName: tsconfig } }
+  const styleLoader = { test: /\.<%- cssExtension %>$/, loader: extractPrepros }
+
+  return {
+    rules: [ tsLinter, tsLoader, styleLoader ]
+  }
+}
