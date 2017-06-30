@@ -1,0 +1,6 @@
+example/*
+node_modules
+*.lock
+*.log
+*.DS_Store
+*.vscode

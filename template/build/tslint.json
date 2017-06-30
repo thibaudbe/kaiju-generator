@@ -1,0 +1,76 @@
+{
+  "rulesDirectory": [
+    "../node_modules/tslint-microsoft-contrib"
+  ],
+  "rules": {
+    "no-unused-variable": [true, { "ignore-pattern": "^_" }],
+    "semicolon": [true, "never"],
+    "no-any": true,
+    "no-arg": true,
+    "no-bitwise": true,
+    "no-conditional-assignment": true,
+    "class-name": true,
+    "no-construct": true,
+    "no-debugger": true,
+    "no-empty-interfaces": true,
+    "no-eval": true,
+    "no-function-expression": true,
+    "no-increment-decrement": true,
+    "one-variable-per-declaration": true,
+    "no-reference": true,
+    "no-shadowed-variable": true,
+    "no-suspicious-comment": true,
+    "no-switch-case-fall-through": true,
+    "no-trailing-whitespace": true,
+    "no-typeof-undefined": true,
+    "no-unnecessary-bind": true,
+    "no-unnecessary-local-variable": true,
+    "no-unsafe-finally": true,
+    "no-unused-expression": true,
+    "no-var-keyword": true,
+    "no-var-self": true,
+    "no-with-statement": true,
+    "prefer-const": true,
+    "triple-equals": true,
+    "whitespace": [
+      true,
+      "check-branch",
+      "check-decl",
+      "check-operator",
+      "check-separator",
+      "check-type"
+    ],
+    "typedef-whitespace": [
+      true,
+      {
+        "call-signature": "nospace",
+        "index-signature": "nospace",
+        "parameter": "nospace",
+        "property-declaration": "nospace",
+        "variable-declaration": "nospace"
+      }
+    ],
+    "quotemark": [
+      true,
+      "single"
+    ],
+    "indent": [
+      true,
+      "spaces"
+    ],
+    "max-line-length": [
+      true,
+      140
+    ],
+    "no-console": [
+      true,
+      "debug",
+      "info",
+      "log",
+      "time",
+      "timeEnd",
+      "trace"
+    ],
+    "align": [true, "statements", { "minLength": 2, "maxLength": 2 }]
+  }
+}
