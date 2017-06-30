@@ -156,7 +156,7 @@ function createApplication(name, path) {
   mkdir(path)
     .then(() => mkdir(path + '/client'))
     .then(() => {
-      copyTemplate('_base/.gitignore', path + '/client/.gitignore')
+      copyTemplate('_base/gitignore', path + '/client/.gitignore')
       copyTemplate('_base/tsconfig.json', path + '/client/tsconfig.json')
       write(path + '/client/package.json', JSON.stringify(pkg, null, 2) + '\n')
     })
