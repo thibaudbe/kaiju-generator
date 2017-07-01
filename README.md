@@ -63,6 +63,10 @@ Generate your app in a custom path:
 kaiju --css=scss ~/Desktop/myApp
 ```
 
+## How to
+
+If you need more details, feel free to read the [doc](https://github.com/thibaudbe/kaiju-generator/tree/master/doc).
+
 ### TODO
 
 Add option to generate empty templates in a custom path:
