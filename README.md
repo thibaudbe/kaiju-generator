@@ -52,7 +52,7 @@ This generator can also be further configured with the following command line fl
 
     -h, --help           output usage information
     -V, --version        output the version number
-    -c, --css <engine>   add stylesheet <engine> support (less|stylus|sass) (defaults to less)
+    -c, --css <engine>   add stylesheet <engine> support (less|stylus|sass) (default to less)
     -f, --force          force on non-empty directory
 
 ## Example
