@@ -1,32 +1,48 @@
 #!/usr/bin/env node
 
-const ejs = require('ejs')
-const fs = require('fs')
-const path = require('path')
+const path    = require('path')
+const chalk   = require('chalk')
 const program = require('commander')
-const mkdirp = require('mkdirp-promise')
-const readline = require('readline')
-const chalk = require('chalk')
 const sortedObject = require('sorted-object')
 
 const _exit = process.exit
-const _pkg = require('../package.json')
-const templateDir = 'template'
-
-const MODE_0666 = parseInt('0666', 8)
-const MODE_0755 = parseInt('0755', 8)
 
 // Re-assign process.exit because of commander
 process.exit = exit
 
+const _pkg = require('../package.json')
+const util = require('../src/util')
+const pkg  = require('../src/pkg')
 
-// --- Settings
+
+// --- CLI
+
+util.around(program, 'optionMissingArgument', (fn, args) => {
+  program.outputHelp()
+  fn.apply(this, args)
+  return { args: [], unknown: [] }
+})
+
+util.before(program, 'outputHelp', () => {
+  // track if help was shown for unknown option
+  this._helpShown = true
+})
+
+util.before(program, 'unknownOption', () => {
+  // allow unknown options if help was shown, to prevent trailing error
+  this._allowUnknownOption = this._helpShown
+
+  // show help if not yet shown
+  if (!this._helpShown) {
+    program.outputHelp()
+  }
+})
 
 program
   .usage('[options] [dir]')
-  .arguments('<projectName>')
   .version(_pkg.version)
-  .option('-c, --css <engine>', 'add stylesheet <engine> support (less|stylus|scss) (defaults to plain css)')
+  .description('Kaiju generator')
+  .option('-c, --css <engine>', 'add stylesheet <engine> support (less|stylus|scss) (default to plain css)', 'less')
   .option('f, --force', 'force on non-empty directory')
   .parse(process.argv)
 
@@ -39,16 +55,16 @@ if (!exit.exited) {
 
 function main() {
   const destinationPath = program.args.shift() || '.'
-  const appName = createAppName(path.resolve(destinationPath)) || 'hello-world'
+  const appName = util.createAppName(path.resolve(destinationPath)) || 'hello-world'
 
   if (!program.css) program.css = 'less'
   if (program.css === 'stylus') program.css = 'styl'
 
-  checkEmptyDirectory(destinationPath, empty => {
+  util.checkEmptyDirectory(destinationPath, empty => {
     if (empty || program.force) {
       createApplication(appName, destinationPath)
     } else {
-      confirm('destination is not empty, continue ? [y/N] ', function (ok) {
+      confirm('destination is not empty, continue ? [y/N] ', ok => {
         if (ok) {
           process.stdin.destroy()
           createApplication(appName, destinationPath)
@@ -79,68 +95,39 @@ function createApplication(name, path) {
 
 
   // package.json
-  const pkg = {
-    "name": `${ name }-client`,
-    "version": "0.1.0",
-    "scripts": {
-      "start": "npm run watch",
-      "build": "webpack -p --config build/prod.js",
-      "watch": "node_modules/webpack/bin/webpack.js --watch --config build/watch.js",
-      "devloop": "node node_modules/devloop/bin/main.js",
-      "pretest": "npm run build && tsc test/mocha.d.ts test/global.d.ts test/test.ts --outDir ./test --noImplicitAny --strictNullChecks",
-      "test": "mocha test/test.js --ui tdd"
-    },
-    "devDependencies": {
-      "abyssa": "8.0.5",
-      "css-loader": "0.28.4",
-      "extract-text-webpack-plugin": "2.1.2",
-      "kaiju": "0.26.0",
-      "mocha": "3.4.2",
-      "snabbdom": "0.6.7",
-      "space-lift": "0.3.0",
-      "style-loader": "0.18.2",
-      "ts-loader": "2.2.1",
-      "tslint": "4.5.1",
-      "tslint-loader": "3.5.3",
-      "tslint-microsoft-contrib": "5.0.0",
-      "typescript": "2.3.4",
-      "webpack": "2.6.1"
-    }
-  }
-
+  const packageJson = pkg(name)
 
   // CSS Engine support
   switch (program.css) {
     case 'less':
-      pkg.devDependencies['less'] = '2.7.2'
-      pkg.devDependencies['less-loader'] = '4.0.4'
+      packageJson.devDependencies['less'] = '2.7.2'
+      packageJson.devDependencies['less-loader'] = '4.0.4'
       break
     case 'styl':
-      pkg.devDependencies['stylus'] = '0.54.5'
-      pkg.devDependencies['stylus-loader'] = '3.0.1'
+      packageJson.devDependencies['stylus'] = '0.54.5'
+      packageJson.devDependencies['stylus-loader'] = '3.0.1'
       break
     case 'scss':
-      pkg.devDependencies['node-sass'] = '4.5.3'
-      pkg.devDependencies['sass-loader'] = '6.0.6'
+      packageJson.devDependencies['node-sass'] = '4.5.3'
+      packageJson.devDependencies['sass-loader'] = '6.0.6'
       break
   }
 
   if (program.css !== 'styl') {
-    pkg.devDependencies['stylelint'] = '7.12.0'
-    pkg.devDependencies['stylelint-webpack-plugin'] = '0.8.0'
+    packageJson.devDependencies['stylelint'] = '7.12.0'
+    packageJson.devDependencies['stylelint-webpack-plugin'] = '0.8.0'
   }
 
   // sort dependencies like npm(1)
-  pkg.devDependencies = sortedObject(pkg.devDependencies)
-
+  packageJson.devDependencies = sortedObject(packageJson.devDependencies)
 
   // Dynamic templates
-  const appTpl      = loadTemplate('src/view/app/app.ts')
-  const userTpl     = loadTemplate('src/view/user/user.ts')
-  const linkTpl     = loadTemplate('src/widget/link/link.ts')
-  const modulesTpl  = loadTemplate('build/common/modules.js')
-  const pluginsTpl  = loadTemplate('build/common/plugins.js')
-  const resolvesTpl = loadTemplate('build/common/resolves.js')
+  const appTpl      = util.loadTemplate('src/view/app/app.ts')
+  const userTpl     = util.loadTemplate('src/view/user/user.ts')
+  const linkTpl     = util.loadTemplate('src/widget/link/link.ts')
+  const modulesTpl  = util.loadTemplate('build/common/modules.js')
+  const pluginsTpl  = util.loadTemplate('build/common/plugins.js')
+  const resolvesTpl = util.loadTemplate('build/common/resolves.js')
 
   // Template modules
   appTpl.locals.cssExtension  = program.css
@@ -151,88 +138,86 @@ function createApplication(name, path) {
   pluginsTpl.locals.cssExtension  = program.css
   resolvesTpl.locals.cssExtension = program.css
 
-
-  // Make Directories
-  mkdir(path)
-    .then(() => mkdir(path + '/client'))
+  // Create app
+  util.mkdir(path)
+    .then(() => util.mkdir(path + '/client'))
     .then(() => {
-      copyTemplate('_base/gitignore', path + '/client/.gitignore')
-      copyTemplate('_base/tsconfig.json', path + '/client/tsconfig.json')
-      write(path + '/client/package.json', JSON.stringify(pkg, null, 2) + '\n')
+      util.copyTemplate('_base/gitignore', path + '/client/.gitignore')
+      util.copyTemplate('_base/tsconfig.json', path + '/client/tsconfig.json')
+      util.write(path + '/client/package.json', JSON.stringify(packageJson, null, 2) + '\n')
     })
-    .then(() => mkdir(path + '/client/build'))
+    .then(() => util.mkdir(path + '/client/build'))
     .then(() => {
-      copyTemplate('build/prod.js', path + '/client/build/prod.js')
-      copyTemplate('build/watch.js', path + '/client/build/watch.js')
-      copyTemplate('build/tslint.json', path + '/client/build/tslint.json')
+      util.copyTemplate('build/prod.js', path + '/client/build/prod.js')
+      util.copyTemplate('build/watch.js', path + '/client/build/watch.js')
+      util.copyTemplate('build/tslint.json', path + '/client/build/tslint.json')
       if (program.css !== 'styl') {
-        copyTemplate('build/stylelint.json', path + '/client/build/stylelint.json')
+        util.copyTemplate('build/stylelint.json', path + '/client/build/stylelint.json')
       }
     })
-    .then(() => mkdir(path + '/client/build/devloop'))
+    .then(() => util.mkdir(path + '/client/build/devloop'))
     .then(() => {
-      copyTemplate('build/devloop/webpack.js', path + '/client/build/devloop/webpack.js')
+      util.copyTemplate('build/devloop/webpack.js', path + '/client/build/devloop/webpack.js')
     })
-    .then(() => mkdir(path + '/client/build/common'))
+    .then(() => util.mkdir(path + '/client/build/common'))
     .then(() => {
-      write(path + '/client/build/common/modules.js', modulesTpl.render())
-      write(path + '/client/build/common/plugins.js', pluginsTpl.render())
-      write(path + '/client/build/common/resolves.js', resolvesTpl.render())
+      util.write(path + '/client/build/common/modules.js', modulesTpl.render())
+      util.write(path + '/client/build/common/plugins.js', pluginsTpl.render())
+      util.write(path + '/client/build/common/resolves.js', resolvesTpl.render())
     })
-    .then(() => mkdir(path + '/client/src'))
+    .then(() => util.mkdir(path + '/client/src'))
     .then(() => {
-      copyTemplate('src/main.ts', path + '/client/src/main.ts')
-      copyTemplate('src/router.ts', path + '/client/src/router.ts')
+      util.copyTemplate('src/main.ts', path + '/client/src/main.ts')
+      util.copyTemplate('src/router.ts', path + '/client/src/router.ts')
     })
-    .then(() => mkdir(path + '/client/src/store'))
+    .then(() => util.mkdir(path + '/client/src/store'))
     .then(() => {
-      copyTemplate('src/store/appStore.ts', path + '/client/src/store/appStore.ts')
+      util.copyTemplate('src/store/appStore.ts', path + '/client/src/store/appStore.ts')
     })
-    .then(() => mkdir(path + '/client/src/util'))
+    .then(() => util.mkdir(path + '/client/src/util'))
     .then(() => {
-      copyTemplate('src/util/router.ts', path + '/client/src/util/router.ts')
+      util.copyTemplate('src/util/router.ts', path + '/client/src/util/router.ts')
     })
-    .then(() => mkdir(path + '/client/src/util/style'))
+    .then(() => util.mkdir(path + '/client/src/util/style'))
     .then(() => {
       copyCSSTemplate('src/util/style/index', path + '/client/src/util/style/index')
       copyCSSTemplate('src/util/style/variable', path + '/client/src/util/style/variable')
     })
-    .then(() => mkdir(path + '/client/src/view'))
+    .then(() => util.mkdir(path + '/client/src/view'))
     .then(() => {
-      copyTemplate('src/view/index.ts', path + '/client/src/view/index.ts')
+      util.copyTemplate('src/view/index.ts', path + '/client/src/view/index.ts')
     })
-    .then(() => mkdir(path + '/client/src/view/app'))
+    .then(() => util.mkdir(path + '/client/src/view/app'))
     .then(() => {
       copyCSSTemplate('src/view/app/app', path + '/client/src/view/app/app')
       copyCSSTemplate('src/view/app/reset', path + '/client/src/view/app/reset')
-      copyTemplate('src/view/app/index.ts', path + '/client/src/view/app/index.ts')
-      copyTemplate('src/view/app/routeNotFound.ts', path + '/client/src/view/app/routeNotFound.ts')
-      write(path + '/client/src/view/app/app.ts', appTpl.render())
+      util.copyTemplate('src/view/app/index.ts', path + '/client/src/view/app/index.ts')
+      util.copyTemplate('src/view/app/routeNotFound.ts', path + '/client/src/view/app/routeNotFound.ts')
+      util.write(path + '/client/src/view/app/app.ts', appTpl.render())
     })
-    .then(() => mkdir(path + '/client/src/view/user'))
+    .then(() => util.mkdir(path + '/client/src/view/user'))
     .then(() => {
-      copyTemplate('src/view/user/index.ts', path + '/client/src/view/user/index.ts')
+      util.copyTemplate('src/view/user/index.ts', path + '/client/src/view/user/index.ts')
       copyCSSTemplate('src/view/user/user', path + '/client/src/view/user/user')
-      write(path + '/client/src/view/user/user.ts', userTpl.render())
+      util.write(path + '/client/src/view/user/user.ts', userTpl.render())
     })
-    .then(() => mkdir(path + '/client/src/widget'))
-    .then(() => mkdir(path + '/client/src/widget/link'))
+    .then(() => util.mkdir(path + '/client/src/widget'))
+    .then(() => util.mkdir(path + '/client/src/widget/link'))
     .then(() => {
-      copyTemplate('src/widget/link/index.ts', path + '/client/src/widget/link/index.ts')
+      util.copyTemplate('src/widget/link/index.ts', path + '/client/src/widget/link/index.ts')
       copyCSSTemplate('src/widget/link/link', path + '/client/src/widget/link/link')
-      write(path + '/client/src/widget/link/link.ts', linkTpl.render())
+      util.write(path + '/client/src/widget/link/link.ts', linkTpl.render())
     })
-    .then(() => mkdir(path + '/client/test'))
+    .then(() => util.mkdir(path + '/client/test'))
     .then(() => {
-      copyTemplate('test/test.ts', path + '/client/test/test.ts')
-      copyTemplate('test/mocha.d.ts', path + '/client/test/mocha.d.ts')
-      copyTemplate('test/global.d.ts', path + '/client/test/global.d.ts')
+      util.copyTemplate('test/test.ts', path + '/client/test/test.ts')
+      util.copyTemplate('test/mocha.d.ts', path + '/client/test/mocha.d.ts')
+      util.copyTemplate('test/global.d.ts', path + '/client/test/global.d.ts')
     })
-    .then(() => mkdir(path + '/client/typing'))
+    .then(() => util.mkdir(path + '/client/typing'))
     .then(() => {
-      copyTemplate('typing/global.d.ts', path + '/client/typing/global.d.ts')
+      util.copyTemplate('typing/global.d.ts', path + '/client/typing/global.d.ts')
     })
-    // .then(() => console.log( chalk.bgRed.white('   after typing/global.d.ts   ') ))
     .then(() => {
       console.log()
       console.log('   install dependencies:')
@@ -245,87 +230,19 @@ function createApplication(name, path) {
 }
 
 
-// --- Utils
-
-// mkdir -p
-function mkdir(path) {
-  return mkdirp(path)
-    .then(() => console.log('   \x1b[36mcreate\x1b[0m : ' + path))
-    .catch(console.error)
-}
-
-// echo str > path
-function write(path, str, mode) {
-  fs.writeFileSync(path, str, { mode: mode || MODE_0666 })
-  console.log('   \x1b[36mcreate\x1b[0m : ' + path)
-}
-
-// Copy file from template directory
-function copyTemplate(from, to) {
-  from = path.join(__dirname, '..', 'template', from)
-  write(to, fs.readFileSync(from, 'utf-8'))
-}
-
 // Copy CSS files with the right extension
 function copyCSSTemplate(template, destination) {
   switch (program.css) {
     case 'less':
-      copyTemplate(`${ template }.less`, `${ destination }.less`)
+      util.copyTemplate(`${ template }.less`, `${ destination }.less`)
       break
     case 'styl':
-      copyTemplate(`${ template }.styl`, `${ destination }.styl`)
+      util.copyTemplate(`${ template }.styl`, `${ destination }.styl`)
       break
     case 'scss':
-      copyTemplate(`${ template }.scss`, `${ destination }.scss`)
+      util.copyTemplate(`${ template }.scss`, `${ destination }.scss`)
       break
   }
-}
-
-// Create an app name from a directory path, fitting npm naming requirements
-function createAppName(pathName) {
-  return path.basename(pathName)
-    .replace(/[^A-Za-z0-9.()!~*'-]+/g, '-')
-    .replace(/^[-_.]+|-+$/g, '')
-    .toLowerCase()
-}
-
-// Check if the given directory `path` is empty
-function checkEmptyDirectory(path, fn) {
-  fs.readdir(path, function (err, files) {
-    if (err && err.code !== 'ENOENT') throw err
-    fn(!files || !files.length)
-  })
-}
-
-// Prompt for confirmation on STDOUT/STDIN
-function confirm(msg, callback) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  })
-
-  rl.question(msg, input => {
-    rl.close()
-    callback(/^y|yes|ok|true$/i.test(input))
-  })
-}
-
-// Copy file from template directory
-function copyTemplate(from, to) {
-  from = path.join(__dirname, '..', templateDir, from)
-  write(to, fs.readFileSync(from, 'utf-8'))
-}
-
-// Load template file
-function loadTemplate(name) {
-  const contents = fs.readFileSync(path.join(__dirname, '..', templateDir, (name + '.ejs')), 'utf-8')
-  const locals = Object.create(null)
-
-  function render () {
-    return ejs.render(contents, locals)
-  }
-
-  return { locals, render }
 }
 
 // Graceful exit for async STDIO
@@ -340,7 +257,6 @@ function exit(code) {
   exit.exited = true
 
   streams.forEach(stream => {
-    // submit empty write request and wait for completion
     draining += 1
     stream.write('', done)
   })

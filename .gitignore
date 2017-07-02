@@ -1,6 +1,8 @@
-example/*
-node_modules
+example/
+node_modules/
+tmp/
 *.lock
 *.log
 *.DS_Store
 *.vscode
+package-lock.json
