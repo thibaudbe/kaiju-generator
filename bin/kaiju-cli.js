@@ -221,10 +221,10 @@ function createApplication(name, path) {
     .then(() => {
       console.log()
       console.log('   install dependencies:')
-      console.log('     cd %s && npm install', path)
+      console.log('     cd %s/client && npm install', path)
       console.log()
       console.log('   run the app:')
-      console.log('     yarn start')
+      console.log('     npm start')
       console.log()
     })
 }
