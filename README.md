@@ -31,7 +31,7 @@ The quickest way to get started with kaiju is to use the executable `kaiju` to g
 Create the app:
 
 ```sh
-kaiju /myApp && cd /myApp
+kaiju /myApp && cd /myApp/client/
 ```
 
 Install dependencies:
